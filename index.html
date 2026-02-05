@@ -69,10 +69,10 @@ canvas, .linkLayer {
 
     var isAndroid = ua.includes("Android");
     var isFirefox = ua.includes("Firefox");
-    var isGeckoView = ua.includes("GeckoView"); // distinguishes from Firefox Focus
+    var isFirefoxFocus = ua.includes("Focus"); // Firefox Focus is specifically excluded
 
     // Redirect ONLY Android Firefox (regular)
-    if (isAndroid && isFirefox && isGeckoView) {
+    if (isAndroid && isFirefox && !isFirefoxFocus) {
         window.location.replace("/android-firefox.html");
     }
 })();

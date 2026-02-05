@@ -58,42 +58,59 @@ async function render() {
 
     const baseViewport = page.getViewport({ scale: 1 });
 
-    const isMobile = /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent);
+    // Calculate scale to fit the screen
+    const scale = Math.min(
+        window.innerWidth / baseViewport.width,
+        window.innerHeight / baseViewport.height
+    );
 
-    // Desktop: scale to fit window height (high DPI)
-    // Mobile: scale to fit width
-    let scale;
-    if (isMobile) {
-        scale = window.innerWidth / baseViewport.width;
-    } else {
-        scale = Math.min(
-            window.innerWidth / baseViewport.width,
-            window.innerHeight / baseViewport.height
-        );
-    }
+    const viewport = page.getViewport({ scale });
 
-    const dpr = window.devicePixelRatio || 1;
-    const viewport = page.getViewport({ scale: scale * dpr });
-
+    // Set canvas size in **CSS pixels**, not multiplied by DPR
     canvas.width = viewport.width;
     canvas.height = viewport.height;
 
-    const cssWidth = baseViewport.width * scale;
-    const cssHeight = baseViewport.height * scale;
+    canvas.style.width = viewport.width + 'px';
+    canvas.style.height = viewport.height + 'px';
 
-    const offsetX = (window.innerWidth - cssWidth) / 2;
-    const offsetY = (window.innerHeight - cssHeight) / 2;
+    // Center canvas
+    canvas.style.left = (window.innerWidth - viewport.width) / 2 + 'px';
+    canvas.style.top = (window.innerHeight - viewport.height) / 2 + 'px';
 
-    canvas.style.width = cssWidth + 'px';
-    canvas.style.height = cssHeight + 'px';
-    canvas.style.left = offsetX + 'px';
-    canvas.style.top = offsetY + 'px';
-
-    linkLayer.style.width = cssWidth + 'px';
-    linkLayer.style.height = cssHeight + 'px';
-    linkLayer.style.left = offsetX + 'px';
-    linkLayer.style.top = offsetY + 'px';
+    // Link layer same size & position
+    linkLayer.style.width = viewport.width + 'px';
+    linkLayer.style.height = viewport.height + 'px';
+    linkLayer.style.left = canvas.style.left;
+    linkLayer.style.top = canvas.style.top;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    await page.r
+    await page.render({
+        canvasContext: ctx,
+        viewport: viewport
+    }).promise;
+
+    // ---- LINK LAYER ----
+    linkLayer.innerHTML = '';
+    const annotations = await page.getAnnotations();
+    annotations.forEach(ann => {
+        if (ann.subtype === 'Link' && ann.url) {
+            const rect = pdfjsLib.Util.normalizeRect(ann.rect);
+            const view = viewport.convertToViewportRectangle(rect);
+            const a = document.createElement('a');
+            a.href = ann.url;
+            a.target = '_blank';
+            a.style.left = Math.min(view[0], view[2]) + 'px';
+            a.style.top = Math.min(view[1], view[3]) + 'px';
+            a.style.width = Math.abs(view[2] - view[0]) + 'px';
+            a.style.height = Math.abs(view[3] - view[1]) + 'px';
+            linkLayer.appendChild(a);
+        }
+    });
+}
+
+render();
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>

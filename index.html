@@ -85,7 +85,6 @@ const isAndroid = /Android/i.test(ua);
    ANDROID: IMAGE + FULL-PAGE LINK
    ========================= */
 if (isAndroid) {
-    // Insert image + overlay immediately for all Android browsers
     viewer.innerHTML = `
         <div class="android-wrapper">
             <img src="${PNG_URL}" class="android-img" alt="Document">

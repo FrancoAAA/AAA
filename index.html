@@ -1,183 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>SNOW TIGER CAPITAL</title>
+<meta charset="UTF-8">
+<title>SNOW TIGER CAPITAL</title>
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #000;
-        }
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+}
 
-        #viewer {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            background: #000;
-        }
+#viewer {
+    position: fixed;
+    inset: 0;
+    background: #000;
+}
 
-        canvas, .linkLayer {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
+/* DESKTOP CANVAS */
+canvas, .linkLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
 
-        .linkLayer a {
-            pointer-events: auto;
-            position: absolute;
-            display: block;
-            background: rgba(255,255,255,0.12);
-            border-bottom: 2px solid rgba(255,255,255,0.8);
-            border-radius: 2px;
-        }
+.linkLayer a {
+    pointer-events: auto;
+    position: absolute;
+    display: block;
+    background: rgba(255,255,255,0.12);
+    border-bottom: 2px solid rgba(255,255,255,0.8);
+    border-radius: 2px;
+}
 
-        /* Mobile native PDF */
-        .mobile-pdf {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: #000;
-        }
-    </style>
+/* MOBILE PDF */
+.mobile-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #000;
+}
+
+/* Rotate PDF for portrait mobile */
+@media (orientation: portrait) {
+    .rotate-landscape {
+        position: absolute;
+        width: 100vh;
+        height: 100vw;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(90deg);
+        transform-origin: center;
+        background: #000;
+    }
+}
+</style>
 </head>
 
 <body>
 <div id="viewer"></div>
 
 <script type="module">
-    import * as pdfjsLib from './pdfjs/pdf.mjs';
+import * as pdfjsLib from './pdfjs/pdf.mjs';
 
-    const PDF_URL = './document.pdf';
-    const viewer = document.getElementById('viewer');
+const PDF_URL = './document.pdf';
+const viewer = document.getElementById('viewer');
 
-    const isMobile =
-        /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent);
+const isMobile =
+    /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent);
 
-    /* =========================================================
-       MOBILE: use native PDF renderer (reliable, sharp text)
-       ========================================================= */
-    if (isMobile) {
-        viewer.innerHTML = `
-            <embed
+/* =====================================================
+   MOBILE: native PDF (iframe + object fallback)
+   ===================================================== */
+if (isMobile) {
+    viewer.innerHTML = `
+        <div class="rotate-landscape">
+            <iframe
+                class="mobile-frame"
                 src="${PDF_URL}"
-                type="application/pdf"
-                class="mobile-pdf"
-            />
-        `;
-    }
+                title="PDF"
+            ></iframe>
+        </div>
+    `;
+}
 
-    /* =========================================================
-       DESKTOP: PDF.js + canvas
-       ========================================================= */
-    else {
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-            './pdfjs/pdf.worker.mjs';
+/* =====================================================
+   DESKTOP: PDF.js canvas with black background
+   ===================================================== */
+else {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
-        const canvas = document.createElement('canvas');
-        const linkLayer = document.createElement('div');
+    const canvas = document.createElement('canvas');
+    const linkLayer = document.createElement('div');
+    linkLayer.className = 'linkLayer';
 
-        linkLayer.className = 'linkLayer';
+    viewer.appendChild(canvas);
+    viewer.appendChild(linkLayer);
 
-        viewer.appendChild(canvas);
-        viewer.appendChild(linkLayer);
+    const ctx = canvas.getContext('2d');
 
-        const ctx = canvas.getContext('2d');
+    async function render() {
+        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+        const page = await pdf.getPage(1);
 
-        let rendering = false;
+        const baseViewport = page.getViewport({ scale: 1 });
 
-        async function render() {
-            if (rendering) return;
-            rendering = true;
+        const scale = Math.min(
+            window.innerWidth / baseViewport.width,
+            window.innerHeight / baseViewport.height
+        );
 
-            try {
-                const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
-                const page = await pdf.getPage(1);
+        const dpr = window.devicePixelRatio || 1;
+        const viewport = page.getViewport({ scale: scale * dpr });
 
-                const baseViewport = page.getViewport({ scale: 1 });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
 
-                const scale = Math.min(
-                    window.innerWidth / baseViewport.width,
-                    window.innerHeight / baseViewport.height
-                );
+        const cssWidth = baseViewport.width * scale;
+        const cssHeight = baseViewport.height * scale;
 
-                const dpr = window.devicePixelRatio || 1;
-                const viewport = page.getViewport({ scale: scale * dpr });
+        const offsetX = (window.innerWidth - cssWidth) / 2;
+        const offsetY = (window.innerHeight - cssHeight) / 2;
 
-                canvas.width = Math.floor(viewport.width);
-                canvas.height = Math.floor(viewport.height);
+        canvas.style.width = cssWidth + 'px';
+        canvas.style.height = cssHeight + 'px';
+        canvas.style.left = offsetX + 'px';
+        canvas.style.top = offsetY + 'px';
 
-                const cssWidth = baseViewport.width * scale;
-                const cssHeight = baseViewport.height * scale;
+        linkLayer.style.width = cssWidth + 'px';
+        linkLayer.style.height = cssHeight + 'px';
+        linkLayer.style.left = offsetX + 'px';
+        linkLayer.style.top = offsetY + 'px';
 
-                const offsetX = (window.innerWidth - cssWidth) / 2;
-                const offsetY = (window.innerHeight - cssHeight) / 2;
+        // Fill canvas black BEFORE PDF rendering
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                canvas.style.width = `${cssWidth}px`;
-                canvas.style.height = `${cssHeight}px`;
-                canvas.style.left = `${offsetX}px`;
-                canvas.style.top = `${offsetY}px`;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-                linkLayer.style.width = `${cssWidth}px`;
-                linkLayer.style.height = `${cssHeight}px`;
-                linkLayer.style.left = `${offsetX}px`;
-                linkLayer.style.top = `${offsetY}px`;
+        await page.render({
+            canvasContext: ctx,
+            viewport: viewport,
+            background: 'transparent'  // make PDF page itself transparent
+        }).promise;
 
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // ---- LINK LAYER ----
+        linkLayer.innerHTML = '';
+        const annotations = await page.getAnnotations();
 
-                await page.render({
-                    canvasContext: ctx,
-                    viewport
-                }).promise;
+        annotations.forEach(ann => {
+            if (ann.subtype === 'Link' && ann.url) {
+                const rect = pdfjsLib.Util.normalizeRect(ann.rect);
+                const view = viewport.convertToViewportRectangle(rect);
 
-                // ---- LINKS ----
-                linkLayer.innerHTML = '';
-                const annotations = await page.getAnnotations();
+                const a = document.createElement('a');
+                a.href = ann.url;
+                a.target = '_blank';
 
-                annotations.forEach(ann => {
-                    if (ann.subtype === 'Link' && ann.url) {
-                        const rect =
-                            pdfjsLib.Util.normalizeRect(ann.rect);
-                        const view =
-                            viewport.convertToViewportRectangle(rect);
+                a.style.left = `${Math.min(view[0], view[2]) / dpr}px`;
+                a.style.top = `${Math.min(view[1], view[3]) / dpr}px`;
+                a.style.width = `${Math.abs(view[2] - view[0]) / dpr}px`;
+                a.style.height = `${Math.abs(view[3] - view[1]) / dpr}px`;
 
-                        const a = document.createElement('a');
-                        a.href = ann.url;
-                        a.target = '_blank';
-
-                        a.style.left =
-                            `${Math.min(view[0], view[2]) / dpr}px`;
-                        a.style.top =
-                            `${Math.min(view[1], view[3]) / dpr}px`;
-                        a.style.width =
-                            `${Math.abs(view[2] - view[0]) / dpr}px`;
-                        a.style.height =
-                            `${Math.abs(view[3] - view[1]) / dpr}px`;
-
-                        linkLayer.appendChild(a);
-                    }
-                });
-
-            } finally {
-                rendering = false;
+                linkLayer.appendChild(a);
             }
-        }
-
-        render();
-
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(render, 150);
         });
     }
+
+    render();
+    window.addEventListener('resize', render);
+}
 </script>
 </body>
 </html>

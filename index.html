@@ -78,23 +78,11 @@ const isAndroid = /Android/i.test(ua);
 const isAndroidFirefox = /Android.*Firefox/i.test(ua);
 
 /* --------------------------
-   ANDROID FIREFOX: guaranteed rendering
+   ANDROID FIREFOX: forced redirect
 --------------------------- */
 if (isAndroidFirefox) {
-    // remove fixed positioning and overflow to allow Firefox to render
-    document.body.style.overflow = 'auto';
-    viewer.style.position = 'relative';
-    viewer.style.height = 'auto';
-
-    viewer.innerHTML = `
-        <div style="width:100%; min-height:100vh; background:#000; display:flex; align-items:center; justify-content:center;">
-            <a href="${ANDROID_LINK}" target="_blank" style="width:100%; height:100%;">
-                <img src="${FIREFOX_JPG}" style="width:100%; height:auto; display:block;" alt="Document">
-            </a>
-        </div>
-    `;
-    // prevent PDF.js or other scripts from running
-    throw new Error("Android Firefox override");
+    // Force redirect to the image (or page) with the link
+    window.location.href = FIREFOX_JPG;
 }
 
 /* --------------------------

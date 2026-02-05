@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PDF Viewer</title>
+    <title>SNOW TIGER CAPITAL</title>
 
     <meta name="viewport"
           content="width=device-width, height=device-height,
@@ -59,104 +59,116 @@
         const ctx = canvas.getContext('2d');
         const linkLayer = document.getElementById('linkLayer');
 
-        const MAX_CANVAS_SIZE = 8192;
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+        // GPU-safe canvas limits
+        const MAX_CANVAS_SIZE = isMobile ? 4096 : 16384;
+
+        let rendering = false;
 
         function getSafeDPR() {
             const dpr = window.devicePixelRatio || 1;
-            const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
             return isMobile ? Math.min(dpr, 2) : dpr;
         }
 
         async function render() {
-            const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
-            const page = await pdf.getPage(1);
+            if (rendering) return;
+            rendering = true;
 
-            const viewport = page.getViewport({ scale: 1 });
+            try {
+                const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+                const page = await pdf.getPage(1);
 
-            const scale = Math.min(
-                window.innerWidth / viewport.width,
-                window.innerHeight / viewport.height
-            );
+                const viewport = page.getViewport({ scale: 1 });
 
-            const dpr = getSafeDPR();
-
-            let pixelViewport = page.getViewport({ scale: scale * dpr });
-
-            // ---- GPU SAFETY NET (mobile) ----
-            if (
-                pixelViewport.width > MAX_CANVAS_SIZE ||
-                pixelViewport.height > MAX_CANVAS_SIZE
-            ) {
-                const downscale = Math.min(
-                    MAX_CANVAS_SIZE / pixelViewport.width,
-                    MAX_CANVAS_SIZE / pixelViewport.height
+                const scale = Math.min(
+                    window.innerWidth / viewport.width,
+                    window.innerHeight / viewport.height
                 );
 
-                pixelViewport = page.getViewport({
-                    scale: scale * dpr * downscale
-                });
-            }
+                const dpr = getSafeDPR();
 
-            // Canvas pixel size
-            canvas.width = pixelViewport.width;
-            canvas.height = pixelViewport.height;
+                let pixelViewport = page.getViewport({ scale: scale * dpr });
 
-            // CSS display size
-            const displayWidth = viewport.width * scale;
-            const displayHeight = viewport.height * scale;
+                // ---- GPU SAFETY NET ----
+                if (
+                    pixelViewport.width > MAX_CANVAS_SIZE ||
+                    pixelViewport.height > MAX_CANVAS_SIZE
+                ) {
+                    const downscale = Math.min(
+                        MAX_CANVAS_SIZE / pixelViewport.width,
+                        MAX_CANVAS_SIZE / pixelViewport.height
+                    );
 
-            const offsetX = (window.innerWidth - displayWidth) / 2;
-            const offsetY = (window.innerHeight - displayHeight) / 2;
-
-            canvas.style.width = `${displayWidth}px`;
-            canvas.style.height = `${displayHeight}px`;
-            canvas.style.left = `${offsetX}px`;
-            canvas.style.top = `${offsetY}px`;
-
-            linkLayer.style.width = `${displayWidth}px`;
-            linkLayer.style.height = `${displayHeight}px`;
-            linkLayer.style.left = `${offsetX}px`;
-            linkLayer.style.top = `${offsetY}px`;
-
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-            await page.render({
-                canvasContext: ctx,
-                viewport: pixelViewport,
-                background: 'rgba(0,0,0,0)'
-            }).promise;
-
-            // ---- LINK LAYER ----
-            linkLayer.innerHTML = '';
-            const annotations = await page.getAnnotations();
-
-            annotations.forEach((ann) => {
-                if (ann.subtype === 'Link' && ann.url) {
-                    const rect = pdfjsLib.Util.normalizeRect(ann.rect);
-                    const view = pixelViewport.convertToViewportRectangle(rect);
-
-                    const left = Math.min(view[0], view[2]);
-                    const top = Math.min(view[1], view[3]);
-                    const width = Math.abs(view[2] - view[0]);
-                    const height = Math.abs(view[3] - view[1]);
-
-                    const a = document.createElement('a');
-                    a.href = ann.url;
-                    a.target = '_blank';
-
-                    a.style.left = `${left / dpr}px`;
-                    a.style.top = `${top / dpr}px`;
-                    a.style.width = `${width / dpr}px`;
-                    a.style.height = `${height / dpr}px`;
-
-                    linkLayer.appendChild(a);
+                    pixelViewport = page.getViewport({
+                        scale: scale * dpr * downscale
+                    });
                 }
-            });
+
+                // Canvas pixel size
+                canvas.width = pixelViewport.width;
+                canvas.height = pixelViewport.height;
+
+                // CSS display size
+                const displayWidth = viewport.width * scale;
+                const displayHeight = viewport.height * scale;
+
+                const offsetX = (window.innerWidth - displayWidth) / 2;
+                const offsetY = (window.innerHeight - displayHeight) / 2;
+
+                canvas.style.width = `${displayWidth}px`;
+                canvas.style.height = `${displayHeight}px`;
+                canvas.style.left = `${offsetX}px`;
+                canvas.style.top = `${offsetY}px`;
+
+                linkLayer.style.width = `${displayWidth}px`;
+                linkLayer.style.height = `${displayHeight}px`;
+                linkLayer.style.left = `${offsetX}px`;
+                linkLayer.style.top = `${offsetY}px`;
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                await page.render({
+                    canvasContext: ctx,
+                    viewport: pixelViewport,
+                    background: 'rgba(0,0,0,0)'
+                }).promise;
+
+                // ---- LINK LAYER ----
+                linkLayer.innerHTML = '';
+                const annotations = await page.getAnnotations();
+
+                annotations.forEach((ann) => {
+                    if (ann.subtype === 'Link' && ann.url) {
+                        const rect = pdfjsLib.Util.normalizeRect(ann.rect);
+                        const view = pixelViewport.convertToViewportRectangle(rect);
+
+                        const left = Math.min(view[0], view[2]);
+                        const top = Math.min(view[1], view[3]);
+                        const width = Math.abs(view[2] - view[0]);
+                        const height = Math.abs(view[3] - view[1]);
+
+                        const a = document.createElement('a');
+                        a.href = ann.url;
+                        a.target = '_blank';
+
+                        a.style.left = `${left / dpr}px`;
+                        a.style.top = `${top / dpr}px`;
+                        a.style.width = `${width / dpr}px`;
+                        a.style.height = `${height / dpr}px`;
+
+                        linkLayer.appendChild(a);
+                    }
+                });
+
+            } finally {
+                rendering = false;
+            }
         }
 
         render();
 
-        // ---- DEBOUNCED RESIZE (mobile-safe) ----
+        // ---- DEBOUNCED RESIZE ----
         let resizeTimer;
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimer);

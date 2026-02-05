@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>SNOW TIGER CAPITAL</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
 html, body {
     margin: 0;
@@ -12,7 +11,7 @@ html, body {
     width: 100%;
     height: 100%;
     background: #000;
-    overflow: hidden; /* note: overridden for Android Firefox */
+    overflow: hidden;
 }
 
 #viewer {
@@ -21,9 +20,24 @@ html, body {
     background: #000;
 }
 
-/* =========================
-   ANDROID IMAGE + FULL-PAGE LINK
-   ========================= */
+/* PDF.js canvas for desktop/iOS */
+canvas, .linkLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.linkLayer {
+    pointer-events: none;
+}
+
+.linkLayer a {
+    pointer-events: auto;
+    position: absolute;
+    border-bottom: 2px solid rgba(255,255,255,0.85);
+}
+
+/* Android PNG full-page */
 .android-wrapper {
     position: relative;
     width: 100%;
@@ -44,28 +58,8 @@ html, body {
     height: 100%;
     z-index: 10;
 }
-
-/* =========================
-   PDF.js (Desktop + iOS)
-   ========================= */
-canvas, .linkLayer {
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-.linkLayer {
-    pointer-events: none;
-}
-
-.linkLayer a {
-    pointer-events: auto;
-    position: absolute;
-    border-bottom: 2px solid rgba(255,255,255,0.85); /* underline restored */
-}
 </style>
 </head>
-
 <body>
 <div id="viewer"></div>
 
@@ -77,42 +71,43 @@ const ua = navigator.userAgent;
 
 const PDF_URL = './document.pdf';
 const PNG_URL = './document.png';
-const VITAL_LINK = 'https://ch1108677878.com';
+const FIREFOX_JPG = 'https://s1.directupload.eu/images/user/260205/57m2z7ov.jpg';
+const FULLPAGE_LINK = 'https://snowtigercapital.com';
 
 const isAndroid = /Android/i.test(ua);
 const isAndroidFirefox = /Android.*Firefox/i.test(ua);
 
-/* =========================
-   ANDROID FIREFOX: image in normal flow
-   ========================= */
+/* --------------------------
+   ANDROID FIREFOX: guaranteed rendering
+--------------------------- */
 if (isAndroidFirefox) {
-    // Allow scrolling and normal layout (overrides overflow hidden)
+    // remove all fixed containers to allow Firefox to paint
     document.body.style.overflow = 'auto';
     viewer.style.position = 'relative';
     viewer.style.height = 'auto';
 
     viewer.innerHTML = `
-        <div style="width:100%; min-height:100vh; position:relative; background:#000;">
-            <img src="${PNG_URL}" style="width:100%; height:auto; display:block;" alt="Document">
-            <a href="${VITAL_LINK}" target="_blank"
-               style="position:absolute; left:0; top:0; width:100%; height:100%; z-index:10;"></a>
+        <div style="width:100%; min-height:100vh; background:#000; display:flex; align-items:center; justify-content:center;">
+            <a href="${FULLPAGE_LINK}" target="_blank" style="display:block; width:100%; height:100%;">
+                <img src="${FIREFOX_JPG}" style="width:100%; height:auto; display:block;" alt="Document">
+            </a>
         </div>
     `;
 }
-/* =========================
-   OTHER ANDROID: full-screen image + full-page link
-   ========================= */
+/* --------------------------
+   OTHER ANDROID: PNG + full-page link
+--------------------------- */
 else if (isAndroid) {
     viewer.innerHTML = `
         <div class="android-wrapper">
             <img src="${PNG_URL}" class="android-img" alt="Document">
-            <a href="${VITAL_LINK}" target="_blank" class="android-link"></a>
+            <a href="${FULLPAGE_LINK}" target="_blank" class="android-link"></a>
         </div>
     `;
 }
-/* =========================
+/* --------------------------
    DESKTOP + iOS: PDF.js
-   ========================= */
+--------------------------- */
 else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 

@@ -21,6 +21,7 @@
             position: relative;
             width: 100%;
             height: 100%;
+            background: #000;
         }
 
         canvas, .linkLayer {
@@ -30,129 +31,153 @@
         }
 
         .linkLayer a {
-            position: absolute;
             pointer-events: auto;
+            position: absolute;
             display: block;
             background: rgba(255,255,255,0.12);
             border-bottom: 2px solid rgba(255,255,255,0.8);
             border-radius: 2px;
         }
+
+        /* Mobile native PDF */
+        .mobile-pdf {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
+        }
     </style>
 </head>
 
 <body>
-<div id="viewer">
-    <canvas id="pdf"></canvas>
-    <div id="linkLayer" class="linkLayer"></div>
-</div>
+<div id="viewer"></div>
 
 <script type="module">
-import * as pdfjsLib from './pdfjs/pdf.mjs';
+    import * as pdfjsLib from './pdfjs/pdf.mjs';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
+    const PDF_URL = './document.pdf';
+    const viewer = document.getElementById('viewer');
 
-const PDF_URL = './document.pdf';
-const canvas = document.getElementById('pdf');
-const ctx = canvas.getContext('2d', { alpha: false });
-const linkLayer = document.getElementById('linkLayer');
+    const isMobile =
+        /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent);
 
-const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    /* =========================================================
+       MOBILE: use native PDF renderer (reliable, sharp text)
+       ========================================================= */
+    if (isMobile) {
+        viewer.innerHTML = `
+            <embed
+                src="${PDF_URL}"
+                type="application/pdf"
+                class="mobile-pdf"
+            />
+        `;
+    }
 
-// HARD mobile limits (reliability > sharpness)
-const MOBILE_MAX_SIZE = 3000;
+    /* =========================================================
+       DESKTOP: PDF.js + canvas
+       ========================================================= */
+    else {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            './pdfjs/pdf.worker.mjs';
 
-let rendering = false;
+        const canvas = document.createElement('canvas');
+        const linkLayer = document.createElement('div');
 
-async function render() {
-    if (rendering) return;
-    rendering = true;
+        linkLayer.className = 'linkLayer';
 
-    try {
-        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
-        const page = await pdf.getPage(1);
+        viewer.appendChild(canvas);
+        viewer.appendChild(linkLayer);
 
-        const baseViewport = page.getViewport({ scale: 1 });
+        const ctx = canvas.getContext('2d');
 
-        let scale = Math.min(
-            window.innerWidth / baseViewport.width,
-            window.innerHeight / baseViewport.height
-        );
+        let rendering = false;
 
-        // 🔴 Mobile: force safe scale
-        let dpr = isMobile ? 1 : (window.devicePixelRatio || 1);
+        async function render() {
+            if (rendering) return;
+            rendering = true;
 
-        let pixelWidth  = baseViewport.width  * scale * dpr;
-        let pixelHeight = baseViewport.height * scale * dpr;
+            try {
+                const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+                const page = await pdf.getPage(1);
 
-        if (isMobile) {
-            const clamp = Math.min(
-                MOBILE_MAX_SIZE / pixelWidth,
-                MOBILE_MAX_SIZE / pixelHeight,
-                1
-            );
-            scale *= clamp;
-            pixelWidth  = baseViewport.width  * scale;
-            pixelHeight = baseViewport.height * scale;
+                const baseViewport = page.getViewport({ scale: 1 });
+
+                const scale = Math.min(
+                    window.innerWidth / baseViewport.width,
+                    window.innerHeight / baseViewport.height
+                );
+
+                const dpr = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale * dpr });
+
+                canvas.width = Math.floor(viewport.width);
+                canvas.height = Math.floor(viewport.height);
+
+                const cssWidth = baseViewport.width * scale;
+                const cssHeight = baseViewport.height * scale;
+
+                const offsetX = (window.innerWidth - cssWidth) / 2;
+                const offsetY = (window.innerHeight - cssHeight) / 2;
+
+                canvas.style.width = `${cssWidth}px`;
+                canvas.style.height = `${cssHeight}px`;
+                canvas.style.left = `${offsetX}px`;
+                canvas.style.top = `${offsetY}px`;
+
+                linkLayer.style.width = `${cssWidth}px`;
+                linkLayer.style.height = `${cssHeight}px`;
+                linkLayer.style.left = `${offsetX}px`;
+                linkLayer.style.top = `${offsetY}px`;
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                await page.render({
+                    canvasContext: ctx,
+                    viewport
+                }).promise;
+
+                // ---- LINKS ----
+                linkLayer.innerHTML = '';
+                const annotations = await page.getAnnotations();
+
+                annotations.forEach(ann => {
+                    if (ann.subtype === 'Link' && ann.url) {
+                        const rect =
+                            pdfjsLib.Util.normalizeRect(ann.rect);
+                        const view =
+                            viewport.convertToViewportRectangle(rect);
+
+                        const a = document.createElement('a');
+                        a.href = ann.url;
+                        a.target = '_blank';
+
+                        a.style.left =
+                            `${Math.min(view[0], view[2]) / dpr}px`;
+                        a.style.top =
+                            `${Math.min(view[1], view[3]) / dpr}px`;
+                        a.style.width =
+                            `${Math.abs(view[2] - view[0]) / dpr}px`;
+                        a.style.height =
+                            `${Math.abs(view[3] - view[1]) / dpr}px`;
+
+                        linkLayer.appendChild(a);
+                    }
+                });
+
+            } finally {
+                rendering = false;
+            }
         }
 
-        const viewport = page.getViewport({ scale });
+        render();
 
-        canvas.width  = Math.floor(pixelWidth);
-        canvas.height = Math.floor(pixelHeight);
-
-        canvas.style.width  = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
-
-        canvas.style.left = `${(window.innerWidth  - viewport.width)  / 2}px`;
-        canvas.style.top  = `${(window.innerHeight - viewport.height) / 2}px`;
-
-        linkLayer.style.width  = canvas.style.width;
-        linkLayer.style.height = canvas.style.height;
-        linkLayer.style.left   = canvas.style.left;
-        linkLayer.style.top    = canvas.style.top;
-
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-        await page.render({
-            canvasContext: ctx,
-            viewport,
-            intent: 'display'
-        }).promise;
-
-        // ---- LINKS ----
-        linkLayer.innerHTML = '';
-        const annotations = await page.getAnnotations();
-
-        annotations.forEach(a => {
-            if (a.subtype === 'Link' && a.url) {
-                const r = pdfjsLib.Util.normalizeRect(a.rect);
-                const v = viewport.convertToViewportRectangle(r);
-
-                const link = document.createElement('a');
-                link.href = a.url;
-                link.target = '_blank';
-
-                link.style.left   = `${Math.min(v[0], v[2])}px`;
-                link.style.top    = `${Math.min(v[1], v[3])}px`;
-                link.style.width  = `${Math.abs(v[2] - v[0])}px`;
-                link.style.height = `${Math.abs(v[3] - v[1])}px`;
-
-                linkLayer.appendChild(link);
-            }
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(render, 150);
         });
-
-    } finally {
-        rendering = false;
     }
-}
-
-render();
-
-let resizeTimer;
-window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(render, 200);
-});
 </script>
 </body>
 </html>

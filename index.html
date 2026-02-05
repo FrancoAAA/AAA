@@ -45,20 +45,6 @@ canvas, .linkLayer {
     border: none;
     background: #000;
 }
-
-/* Rotate PDF for portrait mobile */
-@media (orientation: portrait) {
-    .rotate-landscape {
-        position: absolute;
-        width: 100vh;
-        height: 100vw;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(90deg);
-        transform-origin: center;
-        background: #000;
-    }
-}
 </style>
 </head>
 
@@ -75,22 +61,20 @@ const isMobile =
     /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent);
 
 /* =====================================================
-   MOBILE: native PDF (iframe + object fallback)
+   MOBILE: native PDF (iframe)
    ===================================================== */
 if (isMobile) {
     viewer.innerHTML = `
-        <div class="rotate-landscape">
-            <iframe
-                class="mobile-frame"
-                src="${PDF_URL}"
-                title="PDF"
-            ></iframe>
-        </div>
+        <iframe
+            class="mobile-frame"
+            src="${PDF_URL}"
+            title="PDF"
+        ></iframe>
     `;
 }
 
 /* =====================================================
-   DESKTOP: PDF.js canvas with black background
+   DESKTOP: PDF.js canvas
    ===================================================== */
 else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
@@ -137,16 +121,13 @@ else {
         linkLayer.style.left = offsetX + 'px';
         linkLayer.style.top = offsetY + 'px';
 
-        // Fill canvas black BEFORE PDF rendering
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Canvas background already black via CSS + PDF is black
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
 
         await page.render({
             canvasContext: ctx,
-            viewport: viewport,
-            background: 'transparent'  // make PDF page itself transparent
+            viewport: viewport
         }).promise;
 
         // ---- LINK LAYER ----

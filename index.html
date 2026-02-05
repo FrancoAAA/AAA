@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>SNOW TIGER CAPITAL</title>
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
 html, body {
     margin: 0;
@@ -15,20 +13,16 @@ html, body {
     background: #000;
     overflow: hidden;
 }
-
 #viewer {
     position: fixed;
     inset: 0;
     background: #000;
 }
-
-/* PDF.js Canvas & Link Layer */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
     left: 0;
 }
-
 .linkLayer a {
     pointer-events: auto;
     position: absolute;
@@ -39,7 +33,6 @@ canvas, .linkLayer {
 }
 </style>
 </head>
-
 <body>
 <div id="viewer"></div>
 
@@ -54,7 +47,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 const canvas = document.createElement('canvas');
 const linkLayer = document.createElement('div');
 linkLayer.className = 'linkLayer';
-
 viewer.appendChild(canvas);
 viewer.appendChild(linkLayer);
 
@@ -66,11 +58,42 @@ async function render() {
 
     const baseViewport = page.getViewport({ scale: 1 });
 
-    // Calculate scale to fit screen
-    const scale = Math.min(
-        window.innerWidth / baseViewport.width,
-        window.innerHeight / baseViewport.height
-    );
+    const isMobile = /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent);
+
+    // Desktop: scale to fit window height (high DPI)
+    // Mobile: scale to fit width
+    let scale;
+    if (isMobile) {
+        scale = window.innerWidth / baseViewport.width;
+    } else {
+        scale = Math.min(
+            window.innerWidth / baseViewport.width,
+            window.innerHeight / baseViewport.height
+        );
+    }
 
     const dpr = window.devicePixelRatio || 1;
-    const viewport = pag
+    const viewport = page.getViewport({ scale: scale * dpr });
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    const cssWidth = baseViewport.width * scale;
+    const cssHeight = baseViewport.height * scale;
+
+    const offsetX = (window.innerWidth - cssWidth) / 2;
+    const offsetY = (window.innerHeight - cssHeight) / 2;
+
+    canvas.style.width = cssWidth + 'px';
+    canvas.style.height = cssHeight + 'px';
+    canvas.style.left = offsetX + 'px';
+    canvas.style.top = offsetY + 'px';
+
+    linkLayer.style.width = cssWidth + 'px';
+    linkLayer.style.height = cssHeight + 'px';
+    linkLayer.style.left = offsetX + 'px';
+    linkLayer.style.top = offsetY + 'px';
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    await page.r

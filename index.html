@@ -21,14 +21,43 @@ html, body {
     background: #000;
 }
 
-/* Android native PDF */
+/* ==============================
+   ANDROID FIREFOX IMAGE FALLBACK
+   ============================== */
+.android-firefox-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.android-firefox-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.android-firefox-link {
+    position: absolute;
+    /* TUNE THESE VALUES */
+    left: 30%;
+    top: 45%;
+    width: 40%;
+    height: 15%;
+    z-index: 10;
+}
+
+/* ==============================
+   ANDROID NATIVE PDF
+   ============================== */
 .android-frame {
     width: 100%;
     height: 100%;
     border: none;
 }
 
-/* PDF.js canvas & links */
+/* ==============================
+   PDF.JS (DESKTOP + iOS)
+   ============================== */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
@@ -43,9 +72,6 @@ canvas, .linkLayer {
     pointer-events: auto;
     position: absolute;
     display: block;
-    background: rgba(255,255,255,0.12);
-    border-bottom: 2px solid rgba(255,255,255,0.8);
-    border-radius: 2px;
 }
 </style>
 </head>
@@ -57,14 +83,40 @@ canvas, .linkLayer {
 import * as pdfjsLib from './pdfjs/pdf.mjs';
 
 const PDF_URL = './document.pdf';
-const viewer = document.getElementById('viewer');
+const PNG_URL = './document.png';
+const VITAL_LINK = 'https://YOUR-VITAL-LINK-HERE';
 
+const viewer = document.getElementById('viewer');
 const ua = navigator.userAgent;
+
 const isAndroid = /Android/i.test(ua);
 const isIOS = /iPhone|iPad|iPod/i.test(ua);
+const isFirefox = /Firefox/i.test(ua);
+const isFocus = /Focus/i.test(ua);
 
 /* =====================================================
-   ANDROID: native PDF (links handled internally)
+   ANDROID FIREFOX (NON-FOCUS): IMAGE FALLBACK
+   ===================================================== */
+if (isAndroid && isFirefox && !isFocus) {
+    viewer.innerHTML = `
+        <div class="android-firefox-wrapper">
+            <img
+                src="${PNG_URL}"
+                alt="Document"
+                class="android-firefox-img"
+            >
+            <a
+                href="${VITAL_LINK}"
+                target="_blank"
+                class="android-firefox-link"
+            ></a>
+        </div>
+    `;
+    return;
+}
+
+/* =====================================================
+   ANDROID (CHROME, SAMSUNG, FIREFOX FOCUS): NATIVE PDF
    ===================================================== */
 if (isAndroid && !isIOS) {
     viewer.innerHTML = `
@@ -74,87 +126,85 @@ if (isAndroid && !isIOS) {
             title="PDF"
         ></iframe>
     `;
+    return;
 }
 
 /* =====================================================
-   DESKTOP + iOS: PDF.js with link layer
+   DESKTOP + iOS: PDF.JS
    ===================================================== */
-else {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
-    const canvas = document.createElement('canvas');
-    const linkLayer = document.createElement('div');
-    linkLayer.className = 'linkLayer';
+const canvas = document.createElement('canvas');
+const linkLayer = document.createElement('div');
+linkLayer.className = 'linkLayer';
 
-    viewer.appendChild(canvas);
-    viewer.appendChild(linkLayer);
+viewer.appendChild(canvas);
+viewer.appendChild(linkLayer);
 
-    const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d');
 
-    async function render() {
-        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
-        const page = await pdf.getPage(1);
+async function render() {
+    const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+    const page = await pdf.getPage(1);
 
-        const baseViewport = page.getViewport({ scale: 1 });
+    const baseViewport = page.getViewport({ scale: 1 });
 
-        const scale = Math.min(
-            window.innerWidth / baseViewport.width,
-            window.innerHeight / baseViewport.height
-        );
+    const scale = Math.min(
+        window.innerWidth / baseViewport.width,
+        window.innerHeight / baseViewport.height
+    );
 
-        const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale });
 
-        // Canvas
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        canvas.style.width = viewport.width + 'px';
-        canvas.style.height = viewport.height + 'px';
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
 
-        const offsetX = (window.innerWidth - viewport.width) / 2;
-        const offsetY = (window.innerHeight - viewport.height) / 2;
+    canvas.style.width = viewport.width + 'px';
+    canvas.style.height = viewport.height + 'px';
 
-        canvas.style.left = offsetX + 'px';
-        canvas.style.top = offsetY + 'px';
+    const offsetX = (window.innerWidth - viewport.width) / 2;
+    const offsetY = (window.innerHeight - viewport.height) / 2;
 
-        // Link layer
-        linkLayer.style.width = viewport.width + 'px';
-        linkLayer.style.height = viewport.height + 'px';
-        linkLayer.style.left = canvas.style.left;
-        linkLayer.style.top = canvas.style.top;
+    canvas.style.left = offsetX + 'px';
+    canvas.style.top = offsetY + 'px';
 
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    linkLayer.style.width = viewport.width + 'px';
+    linkLayer.style.height = viewport.height + 'px';
+    linkLayer.style.left = canvas.style.left;
+    linkLayer.style.top = canvas.style.top;
 
-        await page.render({
-            canvasContext: ctx,
-            viewport
-        }).promise;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-        /* ---------- LINK ANNOTATIONS ---------- */
-        linkLayer.innerHTML = '';
-        const annotations = await page.getAnnotations();
+    await page.render({
+        canvasContext: ctx,
+        viewport
+    }).promise;
 
-        annotations.forEach(ann => {
-            if (ann.subtype === 'Link' && ann.url) {
-                const rect = pdfjsLib.Util.normalizeRect(ann.rect);
-                const view = viewport.convertToViewportRectangle(rect);
+    /* -------- LINK LAYER -------- */
+    linkLayer.innerHTML = '';
+    const annotations = await page.getAnnotations();
 
-                const a = document.createElement('a');
-                a.href = ann.url;
-                a.target = '_blank';
+    annotations.forEach(ann => {
+        if (ann.subtype === 'Link' && ann.url) {
+            const rect = pdfjsLib.Util.normalizeRect(ann.rect);
+            const view = viewport.convertToViewportRectangle(rect);
 
-                a.style.left = Math.min(view[0], view[2]) + 'px';
-                a.style.top = Math.min(view[1], view[3]) + 'px';
-                a.style.width = Math.abs(view[2] - view[0]) + 'px';
-                a.style.height = Math.abs(view[3] - view[1]) + 'px';
+            const a = document.createElement('a');
+            a.href = ann.url;
+            a.target = '_blank';
 
-                linkLayer.appendChild(a);
-            }
-        });
-    }
+            a.style.left = Math.min(view[0], view[2]) + 'px';
+            a.style.top = Math.min(view[1], view[3]) + 'px';
+            a.style.width = Math.abs(view[2] - view[0]) + 'px';
+            a.style.height = Math.abs(view[3] - view[1]) + 'px';
 
-    render();
-    window.addEventListener('resize', render);
+            linkLayer.appendChild(a);
+        }
+    });
 }
+
+render();
+window.addEventListener('resize', render);
 </script>
 </body>
 </html>

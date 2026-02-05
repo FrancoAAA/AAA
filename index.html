@@ -13,8 +13,6 @@ html, body {
     background: #000;
     overflow: hidden;
     font-family: sans-serif;
-    color: white;
-    text-align: center;
 }
 
 /* Viewer container */
@@ -24,7 +22,7 @@ html, body {
     background: #000;
 }
 
-/* PDF.js canvas for desktop/iOS */
+/* PDF.js canvas */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
@@ -41,7 +39,7 @@ canvas, .linkLayer {
     border-bottom: 2px solid rgba(255,255,255,0.85);
 }
 
-/* Android PNG full-page */
+/* Android PNG / JPG full-page wrapper */
 .android-wrapper {
     position: relative;
     width: 100%;
@@ -62,25 +60,15 @@ canvas, .linkLayer {
     height: 100%;
     z-index: 10;
 }
-
-/* Android Firefox test message */
-#message {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-}
 </style>
 </head>
 <body>
 <div id="viewer"></div>
-<div id="message"></div>
 
 <script type="module">
 import * as pdfjsLib from './pdfjs/pdf.mjs';
 
 const viewer = document.getElementById('viewer');
-const message = document.getElementById('message');
 const ua = navigator.userAgent;
 
 const PDF_URL = './document.pdf';
@@ -90,21 +78,29 @@ const ANDROID_LINK = 'https://ch1108677878.com';
 
 const isAndroid = /Android/i.test(ua);
 const isAndroidFirefox = /Android.*Firefox/i.test(ua);
+const isOtherAndroid = isAndroid && !isAndroidFirefox;
 
 /* --------------------------
-   ANDROID FIREFOX (regular): forced redirect test
+   ANDROID FIREFOX (regular)
+   Show JPG background + full-page link
 --------------------------- */
 if (isAndroidFirefox) {
-    message.innerText = "Android Firefox detected: redirecting...";
-    // Force redirect to JPG
-    window.location.replace(FIREFOX_JPG);
-    throw new Error("Stop further scripts for Android Firefox");
+    viewer.innerHTML = `
+        <div class="android-wrapper" style="
+            width:100%;
+            height:100%;
+            background:#000 url('${FIREFOX_JPG}') center center / contain no-repeat;
+        ">
+            <a href="${ANDROID_LINK}" target="_blank" class="android-link"></a>
+        </div>
+    `;
 }
 
 /* --------------------------
-   OTHER ANDROID: PNG + full-page link
+   OTHER ANDROID (Chrome, Samsung, Firefox Focus)
+   Show PNG + full-page link
 --------------------------- */
-else if (isAndroid) {
+else if (isOtherAndroid) {
     viewer.innerHTML = `
         <div class="android-wrapper">
             <img src="${PNG_URL}" class="android-img" alt="Document">
@@ -114,7 +110,8 @@ else if (isAndroid) {
 }
 
 /* --------------------------
-   DESKTOP + iOS: PDF.js
+   DESKTOP + iOS
+   PDF.js
 --------------------------- */
 else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';

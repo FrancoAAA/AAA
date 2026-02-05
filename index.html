@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>SNOW TIGER CAPITAL</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
 html, body {
     margin: 0;
@@ -13,16 +14,19 @@ html, body {
     background: #000;
     overflow: hidden;
 }
+
 #viewer {
     position: fixed;
     inset: 0;
     background: #000;
 }
+
 canvas, .linkLayer {
     position: absolute;
     top: 0;
     left: 0;
 }
+
 .linkLayer a {
     pointer-events: auto;
     position: absolute;
@@ -33,6 +37,7 @@ canvas, .linkLayer {
 }
 </style>
 </head>
+
 <body>
 <div id="viewer"></div>
 
@@ -47,6 +52,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 const canvas = document.createElement('canvas');
 const linkLayer = document.createElement('div');
 linkLayer.className = 'linkLayer';
+
 viewer.appendChild(canvas);
 viewer.appendChild(linkLayer);
 
@@ -58,52 +64,68 @@ async function render() {
 
     const baseViewport = page.getViewport({ scale: 1 });
 
-    // Calculate scale to fit the screen
-    const scale = Math.min(
-        window.innerWidth / baseViewport.width,
-        window.innerHeight / baseViewport.height
-    );
+    const isMobile = /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent);
 
-    const viewport = page.getViewport({ scale });
+    // Mobile: fill width (landscape slide)
+    // Desktop: fit fully inside viewport
+    const scale = isMobile
+        ? window.innerWidth / baseViewport.width
+        : Math.min(
+            window.innerWidth / baseViewport.width,
+            window.innerHeight / baseViewport.height
+        );
 
-    // Set canvas size in **CSS pixels**, not multiplied by DPR
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+    const dpr = window.devicePixelRatio || 1;
 
-    canvas.style.width = viewport.width + 'px';
-    canvas.style.height = viewport.height + 'px';
+    const cssWidth = baseViewport.width * scale;
+    const cssHeight = baseViewport.height * scale;
 
-    // Center canvas
-    canvas.style.left = (window.innerWidth - viewport.width) / 2 + 'px';
-    canvas.style.top = (window.innerHeight - viewport.height) / 2 + 'px';
+    // --- CRITICAL ANDROID FIX ---
+    canvas.width = Math.floor(cssWidth * dpr);
+    canvas.height = Math.floor(cssHeight * dpr);
 
-    // Link layer same size & position
-    linkLayer.style.width = viewport.width + 'px';
-    linkLayer.style.height = viewport.height + 'px';
+    canvas.style.width = cssWidth + 'px';
+    canvas.style.height = cssHeight + 'px';
+
+    const offsetX = (window.innerWidth - cssWidth) / 2;
+    const offsetY = (window.innerHeight - cssHeight) / 2;
+
+    canvas.style.left = offsetX + 'px';
+    canvas.style.top = offsetY + 'px';
+
+    linkLayer.style.width = cssWidth + 'px';
+    linkLayer.style.height = cssHeight + 'px';
     linkLayer.style.left = canvas.style.left;
     linkLayer.style.top = canvas.style.top;
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Reset and apply DPR transform
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const viewport = page.getViewport({ scale });
 
     await page.render({
         canvasContext: ctx,
-        viewport: viewport
+        viewport
     }).promise;
 
     // ---- LINK LAYER ----
     linkLayer.innerHTML = '';
     const annotations = await page.getAnnotations();
+
     annotations.forEach(ann => {
         if (ann.subtype === 'Link' && ann.url) {
             const rect = pdfjsLib.Util.normalizeRect(ann.rect);
             const view = viewport.convertToViewportRectangle(rect);
+
             const a = document.createElement('a');
             a.href = ann.url;
             a.target = '_blank';
+
             a.style.left = Math.min(view[0], view[2]) + 'px';
             a.style.top = Math.min(view[1], view[3]) + 'px';
             a.style.width = Math.abs(view[2] - view[0]) + 'px';
             a.style.height = Math.abs(view[3] - view[1]) + 'px';
+
             linkLayer.appendChild(a);
         }
     });

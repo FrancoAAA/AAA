@@ -12,8 +12,12 @@ html, body {
     height: 100%;
     background: #000;
     overflow: hidden;
+    font-family: sans-serif;
+    color: white;
+    text-align: center;
 }
 
+/* Viewer container */
 #viewer {
     position: fixed;
     inset: 0;
@@ -58,15 +62,25 @@ canvas, .linkLayer {
     height: 100%;
     z-index: 10;
 }
+
+/* Android Firefox test message */
+#message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
 </style>
 </head>
 <body>
 <div id="viewer"></div>
+<div id="message"></div>
 
 <script type="module">
 import * as pdfjsLib from './pdfjs/pdf.mjs';
 
 const viewer = document.getElementById('viewer');
+const message = document.getElementById('message');
 const ua = navigator.userAgent;
 
 const PDF_URL = './document.pdf';
@@ -78,24 +92,12 @@ const isAndroid = /Android/i.test(ua);
 const isAndroidFirefox = /Android.*Firefox/i.test(ua);
 
 /* --------------------------
-   ANDROID FIREFOX (regular): show JPG with full-page link
+   ANDROID FIREFOX (regular): forced redirect test
 --------------------------- */
 if (isAndroidFirefox) {
-    document.body.style.overflow = 'auto';
-    viewer.style.position = 'relative';
-    viewer.style.height = '100%';
-    viewer.innerHTML = `
-        <div style="
-            width:100%;
-            height:100vh;
-            background:#000 url('${FIREFOX_JPG}') center center / contain no-repeat;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-        ">
-            <a href="${ANDROID_LINK}" target="_blank" style="width:100%; height:100%; display:block;"></a>
-        </div>
-    `;
+    message.innerText = "Android Firefox detected: redirecting...";
+    // Force redirect to JPG
+    window.location.replace(FIREFOX_JPG);
     throw new Error("Stop further scripts for Android Firefox");
 }
 

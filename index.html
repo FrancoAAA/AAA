@@ -21,29 +21,33 @@ html, body {
     background: #000;
 }
 
-/* ---------- ANDROID FIREFOX FALLBACK ---------- */
-.android-firefox-wrapper {
+/* =========================
+   ANDROID IMAGE + LINK OVERLAY
+   ========================= */
+.android-wrapper {
     position: relative;
     width: 100%;
     height: 100%;
 }
 
-.android-firefox-img {
+.android-img {
     width: 100%;
     height: auto;
     display: block;
 }
 
-.android-firefox-link {
+.android-link {
     position: absolute;
-    left: 30%;
-    top: 45%;
-    width: 40%;
-    height: 15%;
+    left: 32%;
+    top: 20%;
+    width: 34%;
+    height: 4.3%;
     z-index: 10;
 }
 
-/* ---------- PDF.JS ---------- */
+/* =========================
+   PDF.js (Desktop + iOS)
+   ========================= */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
@@ -57,6 +61,7 @@ canvas, .linkLayer {
 .linkLayer a {
     pointer-events: auto;
     position: absolute;
+    border-bottom: 2px solid rgba(255,255,255,0.85); /* underline restored */
 }
 </style>
 </head>
@@ -67,34 +72,29 @@ canvas, .linkLayer {
 <script type="module">
 import * as pdfjsLib from './pdfjs/pdf.mjs';
 
+const viewer = document.getElementById('viewer');
+const ua = navigator.userAgent;
+
 const PDF_URL = './document.pdf';
 const PNG_URL = './document.png';
 const VITAL_LINK = 'https://YOUR-VITAL-LINK-HERE';
 
-const viewer = document.getElementById('viewer');
-const ua = navigator.userAgent;
+const isAndroid = /Android/i.test(ua);
 
-/* =====================================================
-   ANDROID FIREFOX ONLY → PNG FALLBACK
-   ===================================================== */
-const isAndroidFirefox =
-    /Android/i.test(ua) &&
-    /Firefox/i.test(ua) &&
-    !/Focus/i.test(ua);
-
-if (isAndroidFirefox) {
+/* =========================
+   ANDROID: IMAGE + LINK OVERLAY
+   ========================= */
+if (isAndroid) {
     viewer.innerHTML = `
-        <div class="android-firefox-wrapper">
-            <img src="${PNG_URL}" class="android-firefox-img" alt="Document">
-            <a href="${VITAL_LINK}" target="_blank" class="android-firefox-link"></a>
+        <div class="android-wrapper">
+            <img src="${PNG_URL}" class="android-img" alt="Document">
+            <a href="${VITAL_LINK}" target="_blank" class="android-link"></a>
         </div>
     `;
 } else {
-    /* =====================================================
-       DESKTOP + iOS + EVERYTHING ELSE → PDF.JS
-       (THIS IS YOUR ORIGINAL, WORKING LOGIC)
-       ===================================================== */
-
+    /* =========================
+       DESKTOP + iOS: PDF.js
+       ========================= */
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
     const canvas = document.createElement('canvas');
@@ -111,7 +111,6 @@ if (isAndroidFirefox) {
         const page = await pdf.getPage(1);
 
         const baseViewport = page.getViewport({ scale: 1 });
-
         const scale = Math.min(
             window.innerWidth / baseViewport.width,
             window.innerHeight / baseViewport.height

@@ -61,18 +61,18 @@ canvas, .linkLayer {
 </style>
 
 <!-- =====================================================
-     CRITICAL: ANDROID FIREFOX REDIRECT (NON-MODULE SCRIPT)
+     ANDROID FIREFOX (REGULAR) REDIRECT
      ===================================================== -->
 <script>
 (function () {
     var ua = navigator.userAgent || "";
 
-    var isAndroid = ua.indexOf("Android") !== -1;
-    var isFirefox = ua.indexOf("Firefox") !== -1;
-    var isFirefoxFocus = ua.indexOf("Focus") !== -1;
+    var isAndroid = ua.includes("Android");
+    var isFirefox = ua.includes("Firefox");
+    var isGeckoView = ua.includes("GeckoView"); // distinguishes from Firefox Focus
 
     // Redirect ONLY Android Firefox (regular)
-    if (isAndroid && isFirefox && !isFirefoxFocus) {
+    if (isAndroid && isFirefox && isGeckoView) {
         window.location.replace("/android-firefox.html");
     }
 })();
@@ -84,7 +84,7 @@ canvas, .linkLayer {
 <div id="viewer"></div>
 
 <!-- =====================================================
-     MAIN LOGIC (MODULE SCRIPT)
+     MAIN LOGIC
      ===================================================== -->
 <script type="module">
 import * as pdfjsLib from './pdfjs/pdf.mjs';
@@ -94,12 +94,14 @@ const ua = navigator.userAgent || "";
 
 const isAndroid = /Android/i.test(ua);
 const isFirefox = /Firefox/i.test(ua);
-const isFirefoxFocus = /Focus/i.test(ua);
-const isOtherAndroid = isAndroid && (!isFirefox || isFirefoxFocus);
+const isGeckoView = /GeckoView/i.test(ua);
+
+// Other Android = Android but NOT Firefox regular
+const isOtherAndroid = isAndroid && !(isFirefox && isGeckoView);
 
 /* =====================================================
    OTHER ANDROID (Chrome, Samsung, Firefox Focus)
-   PNG + FULL PAGE LINK
+   PNG + FULL-PAGE LINK
    ===================================================== */
 if (isOtherAndroid) {
     viewer.innerHTML = `

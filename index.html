@@ -21,23 +21,31 @@ html, body {
     background: #000;
 }
 
-/* Native Android PDF */
+/* Android native PDF */
 .android-frame {
     width: 100%;
     height: 100%;
     border: none;
 }
 
-/* PDF.js */
+/* PDF.js canvas & links */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
     left: 0;
 }
 
+.linkLayer {
+    pointer-events: none;
+}
+
 .linkLayer a {
     pointer-events: auto;
     position: absolute;
+    display: block;
+    background: rgba(255,255,255,0.12);
+    border-bottom: 2px solid rgba(255,255,255,0.8);
+    border-radius: 2px;
 }
 </style>
 </head>
@@ -56,7 +64,7 @@ const isAndroid = /Android/i.test(ua);
 const isIOS = /iPhone|iPad|iPod/i.test(ua);
 
 /* =====================================================
-   ANDROID: native PDF viewer (rock solid)
+   ANDROID: native PDF (links handled internally)
    ===================================================== */
 if (isAndroid && !isIOS) {
     viewer.innerHTML = `
@@ -69,7 +77,7 @@ if (isAndroid && !isIOS) {
 }
 
 /* =====================================================
-   DESKTOP + iOS: PDF.js
+   DESKTOP + iOS: PDF.js with link layer
    ===================================================== */
 else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
@@ -96,16 +104,21 @@ else {
 
         const viewport = page.getViewport({ scale });
 
+        // Canvas
         canvas.width = viewport.width;
         canvas.height = viewport.height;
-
         canvas.style.width = viewport.width + 'px';
         canvas.style.height = viewport.height + 'px';
-        canvas.style.left = (window.innerWidth - viewport.width) / 2 + 'px';
-        canvas.style.top = (window.innerHeight - viewport.height) / 2 + 'px';
 
-        linkLayer.style.width = canvas.style.width;
-        linkLayer.style.height = canvas.style.height;
+        const offsetX = (window.innerWidth - viewport.width) / 2;
+        const offsetY = (window.innerHeight - viewport.height) / 2;
+
+        canvas.style.left = offsetX + 'px';
+        canvas.style.top = offsetY + 'px';
+
+        // Link layer
+        linkLayer.style.width = viewport.width + 'px';
+        linkLayer.style.height = viewport.height + 'px';
         linkLayer.style.left = canvas.style.left;
         linkLayer.style.top = canvas.style.top;
 
@@ -115,6 +128,28 @@ else {
             canvasContext: ctx,
             viewport
         }).promise;
+
+        /* ---------- LINK ANNOTATIONS ---------- */
+        linkLayer.innerHTML = '';
+        const annotations = await page.getAnnotations();
+
+        annotations.forEach(ann => {
+            if (ann.subtype === 'Link' && ann.url) {
+                const rect = pdfjsLib.Util.normalizeRect(ann.rect);
+                const view = viewport.convertToViewportRectangle(rect);
+
+                const a = document.createElement('a');
+                a.href = ann.url;
+                a.target = '_blank';
+
+                a.style.left = Math.min(view[0], view[2]) + 'px';
+                a.style.top = Math.min(view[1], view[3]) + 'px';
+                a.style.width = Math.abs(view[2] - view[0]) + 'px';
+                a.style.height = Math.abs(view[3] - view[1]) + 'px';
+
+                linkLayer.appendChild(a);
+            }
+        });
     }
 
     render();

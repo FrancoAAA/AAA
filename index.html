@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>SNOW TIGER CAPITAL</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
 html, body {
     margin: 0;
@@ -21,6 +22,7 @@ html, body {
     background: #000;
 }
 
+/* PDF.js */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
@@ -37,6 +39,7 @@ canvas, .linkLayer {
     border-bottom: 2px solid rgba(255,255,255,0.85);
 }
 
+/* Android PNG */
 .android-wrapper {
     position: relative;
     width: 100%;
@@ -45,41 +48,60 @@ canvas, .linkLayer {
 
 .android-img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: contain;
     display: block;
 }
 
 .android-link {
     position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     z-index: 10;
 }
 </style>
+
+<!-- =====================================================
+     CRITICAL: ANDROID FIREFOX REDIRECT (NON-MODULE SCRIPT)
+     ===================================================== -->
+<script>
+(function () {
+    var ua = navigator.userAgent || "";
+
+    var isAndroid = ua.indexOf("Android") !== -1;
+    var isFirefox = ua.indexOf("Firefox") !== -1;
+    var isFirefoxFocus = ua.indexOf("Focus") !== -1;
+
+    // Redirect ONLY Android Firefox (regular)
+    if (isAndroid && isFirefox && !isFirefoxFocus) {
+        window.location.replace("/android-firefox.html");
+    }
+})();
+</script>
+
 </head>
 <body>
+
 <div id="viewer"></div>
 
+<!-- =====================================================
+     MAIN LOGIC (MODULE SCRIPT)
+     ===================================================== -->
 <script type="module">
 import * as pdfjsLib from './pdfjs/pdf.mjs';
 
 const viewer = document.getElementById('viewer');
-const ua = navigator.userAgent || navigator.vendor || window.opera;
+const ua = navigator.userAgent || "";
 
-// -------- Device detection --------
 const isAndroid = /Android/i.test(ua);
-const isAndroidFirefox = isAndroid && /Firefox/i.test(ua);
-const isOtherAndroid = isAndroid && !/Firefox/i.test(ua);
+const isFirefox = /Firefox/i.test(ua);
+const isFirefoxFocus = /Focus/i.test(ua);
+const isOtherAndroid = isAndroid && (!isFirefox || isFirefoxFocus);
 
-// -------- Android Firefox redirect --------
-if (isAndroidFirefox) {
-    window.location.href = '/android-firefox.html';
-}
-
-// -------- Other Android (Chrome, Samsung, Firefox Focus) --------
-else if (isOtherAndroid) {
+/* =====================================================
+   OTHER ANDROID (Chrome, Samsung, Firefox Focus)
+   PNG + FULL PAGE LINK
+   ===================================================== */
+if (isOtherAndroid) {
     viewer.innerHTML = `
         <div class="android-wrapper">
             <img src="./document.png" class="android-img" alt="Document">
@@ -88,7 +110,10 @@ else if (isOtherAndroid) {
     `;
 }
 
-// -------- Desktop + iPhone PDF.js --------
+/* =====================================================
+   DESKTOP + iOS
+   PDF.js
+   ===================================================== */
 else {
     pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
@@ -162,5 +187,6 @@ else {
     window.addEventListener('resize', render);
 }
 </script>
+
 </body>
 </html>

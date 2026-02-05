@@ -21,6 +21,14 @@ html, body {
     background: #000;
 }
 
+/* Native Android PDF */
+.android-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* PDF.js */
 canvas, .linkLayer {
     position: absolute;
     top: 0;
@@ -30,10 +38,6 @@ canvas, .linkLayer {
 .linkLayer a {
     pointer-events: auto;
     position: absolute;
-    display: block;
-    background: rgba(255,255,255,0.12);
-    border-bottom: 2px solid rgba(255,255,255,0.8);
-    border-radius: 2px;
 }
 </style>
 </head>
@@ -47,92 +51,75 @@ import * as pdfjsLib from './pdfjs/pdf.mjs';
 const PDF_URL = './document.pdf';
 const viewer = document.getElementById('viewer');
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
+const ua = navigator.userAgent;
+const isAndroid = /Android/i.test(ua);
+const isIOS = /iPhone|iPad|iPod/i.test(ua);
 
-const canvas = document.createElement('canvas');
-const linkLayer = document.createElement('div');
-linkLayer.className = 'linkLayer';
+/* =====================================================
+   ANDROID: native PDF viewer (rock solid)
+   ===================================================== */
+if (isAndroid && !isIOS) {
+    viewer.innerHTML = `
+        <iframe
+            class="android-frame"
+            src="${PDF_URL}"
+            title="PDF"
+        ></iframe>
+    `;
+}
 
-viewer.appendChild(canvas);
-viewer.appendChild(linkLayer);
+/* =====================================================
+   DESKTOP + iOS: PDF.js
+   ===================================================== */
+else {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.mjs';
 
-const ctx = canvas.getContext('2d', { alpha: false });
+    const canvas = document.createElement('canvas');
+    const linkLayer = document.createElement('div');
+    linkLayer.className = 'linkLayer';
 
-async function render() {
-    const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
-    const page = await pdf.getPage(1);
+    viewer.appendChild(canvas);
+    viewer.appendChild(linkLayer);
 
-    const baseViewport = page.getViewport({ scale: 1 });
+    const ctx = canvas.getContext('2d');
 
-    const isMobile = /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent);
+    async function render() {
+        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+        const page = await pdf.getPage(1);
 
-    const scale = isMobile
-        ? window.innerWidth / baseViewport.width
-        : Math.min(
+        const baseViewport = page.getViewport({ scale: 1 });
+
+        const scale = Math.min(
             window.innerWidth / baseViewport.width,
             window.innerHeight / baseViewport.height
         );
 
-    const dpr = window.devicePixelRatio || 1;
+        const viewport = page.getViewport({ scale });
 
-    // IMPORTANT:
-    // DPR is applied ONLY via the viewport, not via ctx.setTransform
-    const viewport = page.getViewport({
-        scale: scale * dpr
-    });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
 
-    const cssWidth = baseViewport.width * scale;
-    const cssHeight = baseViewport.height * scale;
+        canvas.style.width = viewport.width + 'px';
+        canvas.style.height = viewport.height + 'px';
+        canvas.style.left = (window.innerWidth - viewport.width) / 2 + 'px';
+        canvas.style.top = (window.innerHeight - viewport.height) / 2 + 'px';
 
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
+        linkLayer.style.width = canvas.style.width;
+        linkLayer.style.height = canvas.style.height;
+        linkLayer.style.left = canvas.style.left;
+        linkLayer.style.top = canvas.style.top;
 
-    canvas.style.width = cssWidth + 'px';
-    canvas.style.height = cssHeight + 'px';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    const offsetX = (window.innerWidth - cssWidth) / 2;
-    const offsetY = (window.innerHeight - cssHeight) / 2;
+        await page.render({
+            canvasContext: ctx,
+            viewport
+        }).promise;
+    }
 
-    canvas.style.left = offsetX + 'px';
-    canvas.style.top = offsetY + 'px';
-
-    linkLayer.style.width = cssWidth + 'px';
-    linkLayer.style.height = cssHeight + 'px';
-    linkLayer.style.left = canvas.style.left;
-    linkLayer.style.top = canvas.style.top;
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    await page.render({
-        canvasContext: ctx,
-        viewport
-    }).promise;
-
-    // ---- LINK LAYER ----
-    linkLayer.innerHTML = '';
-    const annotations = await page.getAnnotations();
-
-    annotations.forEach(ann => {
-        if (ann.subtype === 'Link' && ann.url) {
-            const rect = pdfjsLib.Util.normalizeRect(ann.rect);
-            const view = viewport.convertToViewportRectangle(rect);
-
-            const a = document.createElement('a');
-            a.href = ann.url;
-            a.target = '_blank';
-
-            a.style.left = (Math.min(view[0], view[2]) / dpr) + 'px';
-            a.style.top = (Math.min(view[1], view[3]) / dpr) + 'px';
-            a.style.width = (Math.abs(view[2] - view[0]) / dpr) + 'px';
-            a.style.height = (Math.abs(view[3] - view[1]) / dpr) + 'px';
-
-            linkLayer.appendChild(a);
-        }
-    });
+    render();
+    window.addEventListener('resize', render);
 }
-
-render();
-window.addEventListener('resize', render);
 </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SNOW TIGER CAPITAL</title>
+    <title>PDF Viewer</title>
 
     <meta name="viewport"
           content="width=device-width, height=device-height,
@@ -20,8 +20,8 @@
 
         #viewer {
             position: relative;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
         }
 
@@ -42,6 +42,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="viewer">
         <canvas id="pdf"></canvas>
@@ -58,31 +59,52 @@
         const ctx = canvas.getContext('2d');
         const linkLayer = document.getElementById('linkLayer');
 
+        const MAX_CANVAS_SIZE = 8192;
+
+        function getSafeDPR() {
+            const dpr = window.devicePixelRatio || 1;
+            const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+            return isMobile ? Math.min(dpr, 2) : dpr;
+        }
+
         async function render() {
             const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
             const page = await pdf.getPage(1);
 
             const viewport = page.getViewport({ scale: 1 });
 
-            // Fit PDF without stretching
             const scale = Math.min(
                 window.innerWidth / viewport.width,
                 window.innerHeight / viewport.height
             );
 
-            const dpr = window.devicePixelRatio || 1;
+            const dpr = getSafeDPR();
 
-            // Canvas pixel size (for sharpness)
-            const pixelViewport = page.getViewport({ scale: scale * dpr });
+            let pixelViewport = page.getViewport({ scale: scale * dpr });
 
+            // ---- GPU SAFETY NET (mobile) ----
+            if (
+                pixelViewport.width > MAX_CANVAS_SIZE ||
+                pixelViewport.height > MAX_CANVAS_SIZE
+            ) {
+                const downscale = Math.min(
+                    MAX_CANVAS_SIZE / pixelViewport.width,
+                    MAX_CANVAS_SIZE / pixelViewport.height
+                );
+
+                pixelViewport = page.getViewport({
+                    scale: scale * dpr * downscale
+                });
+            }
+
+            // Canvas pixel size
             canvas.width = pixelViewport.width;
             canvas.height = pixelViewport.height;
 
-            // Display size
+            // CSS display size
             const displayWidth = viewport.width * scale;
             const displayHeight = viewport.height * scale;
 
-            // Centering offsets
             const offsetX = (window.innerWidth - displayWidth) / 2;
             const offsetY = (window.innerHeight - displayHeight) / 2;
 
@@ -122,7 +144,6 @@
                     a.href = ann.url;
                     a.target = '_blank';
 
-                    // NOTE: scale back to CSS pixels
                     a.style.left = `${left / dpr}px`;
                     a.style.top = `${top / dpr}px`;
                     a.style.width = `${width / dpr}px`;
@@ -134,8 +155,13 @@
         }
 
         render();
-        window.addEventListener('resize', render);
+
+        // ---- DEBOUNCED RESIZE (mobile-safe) ----
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(render, 150);
+        });
     </script>
 </body>
 </html>
-
